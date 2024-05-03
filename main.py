@@ -24,6 +24,7 @@ class App(FluentWindow):
         super().__init__()
         self.setWindowTitle("Lutalica")
         self.setWindowIcon(QIcon('resource/logo.png'))
+        self.showMaximized()
         self.home = HomeWindow()
         self.home.setObjectName("Home")
         self.addSubInterface(self.home, FluentIcon.HOME, "主页")
