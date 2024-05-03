@@ -1,3 +1,4 @@
+import json
 import logging
 
 import requests
@@ -27,6 +28,8 @@ class subWindow1(QFrame):
     def __init__(self, parent=None):
         super().__init__(parent=parent)
 
+        self.aliveHosts = set()
+
         layout = QHBoxLayout(self)
         leftLayout = QVBoxLayout()
         rightLayout = QVBoxLayout(self)
@@ -52,12 +55,14 @@ class subWindow1(QFrame):
         self.icon.setIcon(FluentIcon.CONNECT)
         self.target = LineEdit()
         self.target.setPlaceholderText("https://192-168-1-{X}.pvp3994.bugku.cn")
-        buttonText = "开始扫描"
-        self.scan = PushButton(buttonText, self)
+        self.scanButton = PushButton("开始扫描", self)
+        self.stopButton = PushButton("停止扫描", self)
+        self.scanState = "stopped"
         targetLayout.addWidget(self.targetLabel)
         targetLayout.addWidget(self.icon)
         targetLayout.addWidget(self.target)
-        targetLayout.addWidget(self.scan)
+        targetLayout.addWidget(self.scanButton)
+        targetLayout.addWidget(self.stopButton)
         leftLayout.addWidget(scanContainer)
 
         paramContainer = QWidget()
@@ -69,7 +74,6 @@ class subWindow1(QFrame):
         self.start.setPlaceholderText("起始值")
         paramLayout.addWidget(self.startLabel)
         paramLayout.addWidget(self.start)
-        # startLayout.addStretch(1)
         self.endLabel = CaptionLabel("最大值", self)
         setFont(self.endLabel, 18)
         self.end = LineEdit()
@@ -77,7 +81,6 @@ class subWindow1(QFrame):
         self.end.setPlaceholderText("最大值")
         paramLayout.addWidget(self.endLabel)
         paramLayout.addWidget(self.end)
-        # startLayout.addStretch(1)
         self.stepLabel = CaptionLabel("步进", self)
         setFont(self.stepLabel, 18)
         self.step = LineEdit()
@@ -95,43 +98,88 @@ class subWindow1(QFrame):
         paramLayout.addStretch(1)
         leftLayout.addWidget(paramContainer)
 
+        listContainer = QWidget()
+        listLayout = QHBoxLayout(listContainer)
         self.listLabel = CaptionLabel("[+]靶机列表", self)
         setFont(self.listLabel, 18)
-        leftLayout.addWidget(self.listLabel)
+        self.clearButton = PushButton("清空", self)
+        self.clearButton.setFixedWidth(100)
+        listLayout.addWidget(self.listLabel)
+        listLayout.addWidget(self.clearButton)
+        leftLayout.addWidget(listContainer)
+
         self.list = ListWidget(self)
         self.list.setFixedHeight(320)
+        self.addItemSlot("存活靶机")
         leftLayout.addWidget(self.list)
         leftLayout.setStretchFactor(self.list, 1)
         leftLayout.addStretch(1)
 
         self.logLabel = CaptionLabel("[*]扫描日志", self)
+        self.logLabel.setFixedHeight(50)
         setFont(self.logLabel, 20)
         rightLayout.addWidget(self.logLabel)
         self.log = TextEdit()
         textFont = QFont()
         textFont.setPointSize(14)
         self.log.setFont(textFont)
+        self.log.setMinimumWidth(500)
         self.log.setReadOnly(True)
         rightLayout.addWidget(self.log)
 
         layout.addLayout(leftLayout)
         layout.addLayout(rightLayout)
-        self.scan.clicked.connect(self.HostScan)
+        self.loadHosts()
+        self.scanButton.clicked.connect(self.startScan)
+        self.stopButton.clicked.connect(self.stopScan)
+        self.clearButton.clicked.connect(self.clearHosts)
         self.addItemSignal.connect(self.addItemSlot)
 
     def addItemSlot(self, item):
-        item = QListWidgetItem(item)
-        itemFont = QFont()
-        itemFont.setPointSize(14)
-        item.setFont(itemFont)
-        self.list.addItem(item)
+        try:
+            item = QListWidgetItem(item)
+            itemFont = QFont()
+            itemFont.setPointSize(14)
+            item.setFont(itemFont)
+            self.list.addItem(item)
+        except Exception as e:
+            logging.error(e)
+            pass
+
+    def loadHosts(self):
+        try:
+            with open('./data/ip.json', 'r') as f:
+                hosts = json.load(f)
+                for host in hosts:
+                    ip = host["ip"]
+                    self.aliveHosts.add(ip)
+                    self.addItemSlot(ip)
+        except Exception as e:
+            logging.error(e)
+            pass
+
+    def saveHosts(self):
+        try:
+            with open('./data/ip.json', 'w') as f:
+                hosts = [{"ip": host} for host in self.aliveHosts]
+                json.dump(hosts, f)
+        except Exception as e:
+            logging.error(e)
+            pass
+
+    def startScan(self):
+        self.scanState = "running"
+        self.HostScan()
+
+    def stopScan(self):
+        self.scanState = "stopped"
 
     def HostScan(self):
         target = self.target.text()
         start = self.start.text()
         end = self.end.text()
         step = self.step.text()
-        ignore = self.step.text()
+        ignore = self.ignore.text()
         start = int(start) if start.isdigit() else 0
         end = int(end) if end.isdigit() else 0
         step = int(step) if step.isdigit() else 1
@@ -139,19 +187,34 @@ class subWindow1(QFrame):
 
         self.log.append(f"[*] 开始扫描")
         for X in range(start, end + 1, step):
+            if self.scanState == "stopped":
+                self.log.append("[-] 扫描已停止")
+                break
             if X != ignore:
                 url = target.format(X=X)
                 try:
-                    requests.head(url, timeout=1)
-                    self.addItemSignal.emit(url)
-                    self.log.append(f"{url} 存活")
-                    QApplication.processEvents()
+                    requests.head(url, timeout=0.3)
+                    if url not in self.aliveHosts:
+                        self.aliveHosts.add(url)
+                        self.addItemSignal.emit(url)
+                        self.log.append(f"{url} 存活")
+                        QApplication.processEvents()
+                    else:
+                        self.log.append(f"{url} 已存在")
+                        QApplication.processEvents()
                 except Exception as e:
                     self.log.append(f"{url} 无法访问")
                     logging.error(e)
                     QApplication.processEvents()
                     pass
         self.log.append(f"[-] 扫描结束\n")
+        self.saveHosts()
+
+    def clearHosts(self):
+        self.list.clear()
+        self.addItemSlot("存活靶机")
+        with open('./data/ip.json', 'w') as f:
+            json.dump([], f)
 
 
 class App(FluentWindow):
