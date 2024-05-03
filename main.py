@@ -99,19 +99,18 @@ class subWindow1(QFrame):
         setFont(self.listLabel, 18)
         leftLayout.addWidget(self.listLabel)
         self.list = ListWidget(self)
-        font = QFont()
-        font.setPointSize(18)
-        item = QListWidgetItem("url")
-        item.setFont(font)
-        self.list.addItem(item)
+        self.list.setFixedHeight(320)
         leftLayout.addWidget(self.list)
         leftLayout.setStretchFactor(self.list, 1)
         leftLayout.addStretch(1)
 
         self.logLabel = CaptionLabel("[*]扫描日志", self)
-        setFont(self.logLabel, 18)
+        setFont(self.logLabel, 20)
         rightLayout.addWidget(self.logLabel)
         self.log = TextEdit()
+        textFont = QFont()
+        textFont.setPointSize(14)
+        self.log.setFont(textFont)
         self.log.setReadOnly(True)
         rightLayout.addWidget(self.log)
 
@@ -121,6 +120,10 @@ class subWindow1(QFrame):
         self.addItemSignal.connect(self.addItemSlot)
 
     def addItemSlot(self, item):
+        item = QListWidgetItem(item)
+        itemFont = QFont()
+        itemFont.setPointSize(14)
+        item.setFont(itemFont)
         self.list.addItem(item)
 
     def HostScan(self):
@@ -134,6 +137,7 @@ class subWindow1(QFrame):
         step = int(step) if step.isdigit() else 1
         ignore = int(ignore) if ignore.isdigit() else 0
 
+        self.log.append(f"[*] 开始扫描")
         for X in range(start, end + 1, step):
             if X != ignore:
                 url = target.format(X=X)
@@ -143,10 +147,11 @@ class subWindow1(QFrame):
                     self.log.append(f"{url} 存活")
                     QApplication.processEvents()
                 except Exception as e:
-                    self.log.append(f"{url} 不存在")
+                    self.log.append(f"{url} 无法访问")
                     logging.error(e)
                     QApplication.processEvents()
                     pass
+        self.log.append(f"[-] 扫描结束\n")
 
 
 class App(FluentWindow):
@@ -162,7 +167,7 @@ class App(FluentWindow):
 
         self.window1 = subWindow1()
         self.window1.setObjectName("Window1")
-        self.addSubInterface(self.window1, FluentIcon.HISTORY, "作业检查")
+        self.addSubInterface(self.window1, FluentIcon.HISTORY, "靶机扫描")
 
 
 def run():
