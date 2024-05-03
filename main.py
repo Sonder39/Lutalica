@@ -1,10 +1,11 @@
 import logging
 
-from PyQt6.QtCore import Qt
+import requests
+from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QFont, QIcon
-from PyQt6.QtWidgets import QApplication, QFrame, QHBoxLayout, QVBoxLayout, QWidget
+from PyQt6.QtWidgets import QApplication, QFrame, QHBoxLayout, QVBoxLayout, QWidget, QListWidgetItem
 from qfluentwidgets import FluentWindow, FluentIcon, ImageLabel, SubtitleLabel, setFont, CaptionLabel, TextEdit, \
-    LineEdit, PushButton, ToolButton
+    LineEdit, PushButton, ToolButton, ListWidget
 
 logging.basicConfig(level=logging.INFO, format="[%(levelname)s] %(message)s")
 
@@ -21,6 +22,8 @@ class HomeWindow(QFrame):
 
 
 class subWindow1(QFrame):
+    addItemSignal = pyqtSignal(str)
+
     def __init__(self, parent=None):
         super().__init__(parent=parent)
 
@@ -95,10 +98,15 @@ class subWindow1(QFrame):
         self.listLabel = CaptionLabel("[+]靶机列表", self)
         setFont(self.listLabel, 18)
         leftLayout.addWidget(self.listLabel)
-        self.list = TextEdit()
-        self.list.setReadOnly(True)
+        self.list = ListWidget(self)
+        font = QFont()
+        font.setPointSize(18)
+        item = QListWidgetItem("url")
+        item.setFont(font)
+        self.list.addItem(item)
         leftLayout.addWidget(self.list)
         leftLayout.setStretchFactor(self.list, 1)
+        leftLayout.addStretch(1)
 
         self.logLabel = CaptionLabel("[*]扫描日志", self)
         setFont(self.logLabel, 18)
@@ -109,6 +117,36 @@ class subWindow1(QFrame):
 
         layout.addLayout(leftLayout)
         layout.addLayout(rightLayout)
+        self.scan.clicked.connect(self.HostScan)
+        self.addItemSignal.connect(self.addItemSlot)
+
+    def addItemSlot(self, item):
+        self.list.addItem(item)
+
+    def HostScan(self):
+        target = self.target.text()
+        start = self.start.text()
+        end = self.end.text()
+        step = self.step.text()
+        ignore = self.step.text()
+        start = int(start) if start.isdigit() else 0
+        end = int(end) if end.isdigit() else 0
+        step = int(step) if step.isdigit() else 1
+        ignore = int(ignore) if ignore.isdigit() else 0
+
+        for X in range(start, end + 1, step):
+            if X != ignore:
+                url = target.format(X=X)
+                try:
+                    requests.head(url, timeout=1)
+                    self.addItemSignal.emit(url)
+                    self.log.append(f"{url} 存活")
+                    QApplication.processEvents()
+                except Exception as e:
+                    self.log.append(f"{url} 不存在")
+                    logging.error(e)
+                    QApplication.processEvents()
+                    pass
 
 
 class App(FluentWindow):
