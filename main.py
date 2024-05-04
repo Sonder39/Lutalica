@@ -6,7 +6,7 @@ from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QFont, QIcon
 from PyQt6.QtWidgets import QApplication, QFrame, QWidget, QHBoxLayout, QVBoxLayout, QListWidgetItem
 from qfluentwidgets import FluentWindow, FluentIcon, ImageLabel, SubtitleLabel, CaptionLabel, TextEdit, LineEdit, \
-    setFont, PushButton, ToolButton, ListWidget
+    setFont, PushButton, ToolButton, ListWidget, ComboBox
 
 logging.basicConfig(level=logging.INFO,
                     format="[%(levelname)s] %(asctime)s: %(message)s",
@@ -37,10 +37,11 @@ class HomeWindow(QFrame):
 class subWindow1(QFrame):
     addItemSignal = pyqtSignal(str)
 
-    def __init__(self, parent=None):
+    def __init__(self, fileUpdateEvent, parent=None):
         super().__init__(parent=parent)
 
-        self.aliveHosts = set()
+        self.aliveHosts = []
+        self._fileUpdateEvent = fileUpdateEvent
 
         layout = QHBoxLayout(self)
         leftLayout = QVBoxLayout(self)
@@ -63,7 +64,7 @@ class subWindow1(QFrame):
         self.targetLabel = CaptionLabel("扫描目标", self)
         setFont(self.targetLabel, 18)
         self.icon = ToolButton(self)
-        self.icon.setIcon(FluentIcon.CONNECT)
+        self.icon.setIcon(FluentIcon.SEARCH)
         self.target = LineEdit()
         self.target.setPlaceholderText("https://192-168-1-{X}.pvp3994.bugku.cn")
         self.scanButton = PushButton("开始扫描", self)
@@ -164,7 +165,7 @@ class subWindow1(QFrame):
                 hosts = json.load(f)
                 for host in hosts:
                     ip = host["ip"]
-                    self.aliveHosts.add(ip)
+                    self.aliveHosts.append(ip)
                     self.addItemSlot(ip)
         except Exception as e:
             logging.error(e)
@@ -172,9 +173,11 @@ class subWindow1(QFrame):
 
     def saveHosts(self):
         try:
+            self.aliveHosts.sort()
             with open('./data/ip.json', 'w') as f:
                 hosts = [{"ip": host} for host in self.aliveHosts]
                 json.dump(hosts, f)
+            self._fileUpdateEvent.trigger()
         except Exception as e:
             logging.error(e)
             pass
@@ -213,7 +216,7 @@ class subWindow1(QFrame):
                 try:
                     requests.head(url, timeout=0.3)
                     if url not in self.aliveHosts:
-                        self.aliveHosts.add(url)
+                        self.aliveHosts.append(url)
                         self.addItemSignal.emit(url)
                         self.log.append(f"{url} 存活")
                         QApplication.processEvents()
@@ -235,8 +238,151 @@ class subWindow1(QFrame):
     def clearHosts(self):
         self.list.clear()
         self.addItemSlot("存活靶机")
+        self.aliveHosts = []
         with open('./data/ip.json', 'w') as f:
             json.dump([], f)
+        self._fileUpdateEvent.trigger()
+
+
+class subWindow2(QFrame):
+    addItemSignal = pyqtSignal(str)
+
+    def __init__(self, fileUpdateEvent, parent=None):
+        super().__init__(parent=parent)
+
+        self.aliveHosts = []
+        fileUpdateEvent.registerListener(self.loadHosts)
+
+        layout = QHBoxLayout(self)
+        leftLayout = QVBoxLayout(self)
+        rightLayout = QVBoxLayout(self)
+
+        cover = 'resource/Archive2.png'
+        self.image = ImageLabel(cover, self)
+        self.image.scaledToHeight(290)
+        self.image.setBorderRadius(8, 8, 8, 8)
+        leftLayout.addWidget(self.image)
+
+        subtitleLabel = '后门利用'
+        self.subtitle = SubtitleLabel(subtitleLabel, self)
+        setFont(self.subtitle, 24)
+        self.subtitle.setFixedHeight(50)
+        leftLayout.addWidget(self.subtitle, 1, Qt.AlignmentFlag.AlignLeft)
+
+        execContainer = QWidget()
+        pathLayout = QHBoxLayout(execContainer)
+        self.pathLabel = CaptionLabel("后门路径", self)
+        setFont(self.pathLabel, 18)
+        self.icon = ToolButton(self)
+        self.icon.setIcon(FluentIcon.CONNECT)
+        self.path = LineEdit()
+        self.path.setPlaceholderText("/a.php")
+        self.execButton = PushButton("开始执行", self)
+        self.stopButton = PushButton("停止执行", self)
+        self.execState = "stopped"
+        self.method = ComboBox()
+        items = ['GET', 'POST']
+        self.method.addItems(items)
+        pathLayout.addWidget(self.pathLabel)
+        pathLayout.addWidget(self.icon)
+        pathLayout.addWidget(self.path)
+        pathLayout.addWidget(self.method)
+        pathLayout.addWidget(self.execButton)
+        pathLayout.addWidget(self.stopButton)
+        leftLayout.addWidget(execContainer)
+
+        paramContainer = QWidget()
+        paramLayout = QHBoxLayout(paramContainer)
+        self.passwdLabel = CaptionLabel("连接密码", self)
+        setFont(self.passwdLabel, 18)
+        self.passwd = LineEdit()
+        self.passwd.setFixedWidth(150)
+        self.passwd.setPlaceholderText("cmd")
+        paramLayout.addWidget(self.passwdLabel)
+        paramLayout.addWidget(self.passwd)
+        self.commandLabel = CaptionLabel("命令", self)
+        setFont(self.commandLabel, 18)
+        self.command = LineEdit()
+        self.command.setFixedWidth(150)
+        self.command.setPlaceholderText("ls")
+        paramLayout.addWidget(self.commandLabel)
+        paramLayout.addWidget(self.command)
+        self.regexLabel = CaptionLabel("regex", self)
+        setFont(self.regexLabel, 18)
+        self.regex = LineEdit()
+        self.regex.setFixedWidth(150)
+        self.regex.setPlaceholderText("flag{")
+        paramLayout.addWidget(self.regexLabel)
+        paramLayout.addWidget(self.regex)
+        paramLayout.addStretch(1)
+        leftLayout.addWidget(paramContainer)
+
+        listContainer = QWidget()
+        listLayout = QHBoxLayout(listContainer)
+        self.listLabel = CaptionLabel("[+]靶机列表", self)
+        setFont(self.listLabel, 18)
+        listLayout.addWidget(self.listLabel)
+        leftLayout.addWidget(listContainer)
+
+        self.list = ListWidget(self)
+        self.list.setFixedHeight(320)
+        self.list.setSelectionMode(self.list.SelectionMode.ExtendedSelection)
+        self.addItemSlot("存活靶机")
+        leftLayout.addWidget(self.list)
+        leftLayout.setStretchFactor(self.list, 1)
+        leftLayout.addStretch(1)
+
+        self.logLabel = CaptionLabel("[*]执行日志", self)
+        self.logLabel.setFixedHeight(50)
+        setFont(self.logLabel, 20)
+        rightLayout.addWidget(self.logLabel)
+        self.log = TextEdit()
+        textFont = QFont()
+        textFont.setPointSize(14)
+        self.log.setFont(textFont)
+        self.log.setMinimumWidth(350)
+        self.log.setReadOnly(True)
+        rightLayout.addWidget(self.log)
+
+        layout.addLayout(leftLayout)
+        layout.addLayout(rightLayout)
+        self.loadHosts()
+
+    def addItemSlot(self, item):
+        try:
+            item = QListWidgetItem(item)
+            itemFont = QFont()
+            itemFont.setPointSize(14)
+            item.setFont(itemFont)
+            self.list.addItem(item)
+        except Exception as e:
+            logging.error(e)
+            pass
+
+    def loadHosts(self):
+        try:
+            self.list.clear()
+            self.addItemSlot("存活靶机")
+            with open('./data/ip.json', 'r') as f:
+                hosts = json.load(f)
+                for host in hosts:
+                    ip = host["ip"]
+                    self.aliveHosts.append(ip)
+                    self.addItemSlot(ip)
+        except Exception as e:
+            logging.error(e)
+
+
+class Event:
+    def __init__(self):
+        self._listeners = []
+
+    def registerListener(self, listener):
+        self._listeners.append(listener)
+
+    def trigger(self, *args, **kwargs):
+        for listener in self._listeners:
+            listener(*args, **kwargs)
 
 
 class App(FluentWindow):
@@ -249,9 +395,13 @@ class App(FluentWindow):
         self.home.setObjectName("Home")
         self.addSubInterface(self.home, FluentIcon.HOME, "主页")
 
-        self.window1 = subWindow1()
+        updateEvent = Event()
+        self.window1 = subWindow1(updateEvent)
         self.window1.setObjectName("Window1")
         self.addSubInterface(self.window1, FluentIcon.HISTORY, "靶机扫描")
+        self.window2 = subWindow2(updateEvent)
+        self.window2.setObjectName("Window2")
+        self.addSubInterface(self.window2, FluentIcon.COMMAND_PROMPT, "后门利用")
         self.showMaximized()
 
 
