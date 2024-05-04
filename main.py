@@ -4,22 +4,34 @@ import logging
 import requests
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QFont, QIcon
-from PyQt6.QtWidgets import QApplication, QFrame, QHBoxLayout, QVBoxLayout, QWidget, QListWidgetItem
-from qfluentwidgets import FluentWindow, FluentIcon, ImageLabel, SubtitleLabel, setFont, CaptionLabel, TextEdit, \
-    LineEdit, PushButton, ToolButton, ListWidget
+from PyQt6.QtWidgets import QApplication, QFrame, QWidget, QHBoxLayout, QVBoxLayout, QListWidgetItem
+from qfluentwidgets import FluentWindow, FluentIcon, ImageLabel, SubtitleLabel, CaptionLabel, TextEdit, LineEdit, \
+    setFont, PushButton, ToolButton, ListWidget
 
-logging.basicConfig(level=logging.INFO, format="[%(levelname)s] %(message)s")
+logging.basicConfig(level=logging.INFO,
+                    format="[%(levelname)s] %(asctime)s: %(message)s",
+                    datefmt="%Y-%m-%d %A %H:%M:%S")
 
 
 class HomeWindow(QFrame):
     def __init__(self, parent=None):
         super().__init__(parent=parent)
-        layout = QVBoxLayout(self)
+        layout = QHBoxLayout(self)
+        leftLayout = QVBoxLayout(self)
+        rightLayout = QVBoxLayout(self)
+
+        cover = 'resource/logo.png'
+        self.image = ImageLabel(cover, self)
+        self.image.scaledToHeight(450)
+        self.image.setBorderRadius(8, 8, 8, 8)
+        leftLayout.addWidget(self.image)
+
         self.label = CaptionLabel("Lutalica", self)
         setFont(self.label, 64)
-        self.label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        layout.addWidget(self.label, 1, Qt.AlignmentFlag.AlignCenter)
-        self.setLayout(layout)
+        rightLayout.addWidget(self.label, 1, Qt.AlignmentFlag.AlignCenter)
+
+        layout.addLayout(leftLayout)
+        layout.addLayout(rightLayout)
 
 
 class subWindow1(QFrame):
@@ -31,7 +43,7 @@ class subWindow1(QFrame):
         self.aliveHosts = set()
 
         layout = QHBoxLayout(self)
-        leftLayout = QVBoxLayout()
+        leftLayout = QVBoxLayout(self)
         rightLayout = QVBoxLayout(self)
 
         cover = 'resource/Archive1.png'
@@ -123,7 +135,7 @@ class subWindow1(QFrame):
         textFont = QFont()
         textFont.setPointSize(14)
         self.log.setFont(textFont)
-        self.log.setMinimumWidth(500)
+        self.log.setMinimumWidth(350)
         self.log.setReadOnly(True)
         rightLayout.addWidget(self.log)
 
@@ -189,6 +201,7 @@ class subWindow1(QFrame):
         for X in range(start, end + 1, step):
             if self.scanState == "stopped":
                 self.log.append("[-] 扫描已停止")
+                logging.info("[-] 扫描已停止")
                 break
             if X != ignore:
                 url = target.format(X=X)
@@ -199,15 +212,19 @@ class subWindow1(QFrame):
                         self.addItemSignal.emit(url)
                         self.log.append(f"{url} 存活")
                         QApplication.processEvents()
+                        logging.info(f"{url} 存活")
                     else:
                         self.log.append(f"{url} 已存在")
                         QApplication.processEvents()
+                        logging.warning(f"{url} 已存在")
                 except Exception as e:
                     self.log.append(f"{url} 无法访问")
                     logging.error(e)
                     QApplication.processEvents()
+                    logging.warning(f"{url} 无法访问")
                     pass
-        self.log.append(f"[-] 扫描结束\n")
+        self.log.append("[-] 扫描结束\n")
+        logging.info("[-] 扫描结束\n")
         self.saveHosts()
 
     def clearHosts(self):
@@ -222,7 +239,6 @@ class App(FluentWindow):
         super().__init__()
         self.setWindowTitle("Lutalica")
         self.setWindowIcon(QIcon('resource/logo.png'))
-        self.showMaximized()
 
         self.home = HomeWindow()
         self.home.setObjectName("Home")
@@ -231,12 +247,13 @@ class App(FluentWindow):
         self.window1 = subWindow1()
         self.window1.setObjectName("Window1")
         self.addSubInterface(self.window1, FluentIcon.HISTORY, "靶机扫描")
+        self.showMaximized()
 
 
 def run():
     try:
         app = QApplication([])
-        app.setFont(QFont("HarmonyOS Sans SC"))
+        # app.setFont(QFont("HarmonyOS Sans SC"))
         window = App()
         window.show()
         app.exec()
