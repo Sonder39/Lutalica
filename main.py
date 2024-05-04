@@ -54,7 +54,6 @@ class subWindow1(QFrame):
 
         subtitleLabel = '靶机扫描'
         self.subtitle = SubtitleLabel(subtitleLabel, self)
-        self.subtitle.setAlignment(Qt.AlignmentFlag.AlignLeft)
         setFont(self.subtitle, 24)
         self.subtitle.setFixedHeight(50)
         leftLayout.addWidget(self.subtitle, 1, Qt.AlignmentFlag.AlignLeft)
@@ -122,6 +121,7 @@ class subWindow1(QFrame):
 
         self.list = ListWidget(self)
         self.list.setFixedHeight(320)
+        self.list.setSelectionMode(self.list.SelectionMode.ExtendedSelection)
         self.addItemSlot("存活靶机")
         leftLayout.addWidget(self.list)
         leftLayout.setStretchFactor(self.list, 1)
@@ -195,7 +195,12 @@ class subWindow1(QFrame):
         start = int(start) if start.isdigit() else 0
         end = int(end) if end.isdigit() else 0
         step = int(step) if step.isdigit() else 1
-        ignore = int(ignore) if ignore.isdigit() else 0
+        try:
+            ignore = [int(i) for i in ignore.split(',')]
+        except Exception as e:
+            ignore = []
+            logging.error(e)
+            pass
 
         self.log.append(f"[*] 开始扫描")
         for X in range(start, end + 1, step):
@@ -203,7 +208,7 @@ class subWindow1(QFrame):
                 self.log.append("[-] 扫描已停止")
                 logging.info("[-] 扫描已停止")
                 break
-            if X != ignore:
+            if X not in ignore:
                 url = target.format(X=X)
                 try:
                     requests.head(url, timeout=0.3)
