@@ -9,9 +9,12 @@ from PyQt6.QtWidgets import QApplication, QFrame, QWidget, QHBoxLayout, QVBoxLay
 from qfluentwidgets import FluentWindow, FluentIcon, ImageLabel, SubtitleLabel, CaptionLabel, TextEdit, LineEdit, \
     setFont, PushButton, ToolButton, ListWidget, ComboBox
 
-logging.basicConfig(level=logging.INFO,
-                    format="[%(levelname)s] %(asctime)s: %(message)s",
-                    datefmt="%Y-%m-%d %A %H:%M:%S")
+logging.basicConfig(
+    filename="app.log",
+    level=logging.INFO,
+    format="[%(levelname)s] %(asctime)s: %(message)s",
+    datefmt="%Y-%m-%d %A %H:%M:%S"
+)
 
 
 class HomeWindow(QFrame):
