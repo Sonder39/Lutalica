@@ -1,1 +1,11 @@
-[{"flag": "flag{adbc9925cd798b3f21acf0895eed8a31740dccfe}"}, {"flag": "flag{b92f46f80db7ae74b6a5dcf21264e78716e523d2}"}, {"flag": "flag{ffc83138b5272f05ff433497aadb7dec2753d1ee}"}]
+[
+  {
+    "flag": "flag{0a33abdf63544a3c5a41a1d53bdf91625450c05f}"
+  },
+  {
+    "flag": "flag{213b19e5dbd1cf94ad4c913298bcc8799ed53e13}"
+  },
+  {
+    "flag": "flag{55ef5ce3621cd86935bbabcb89603dc25aa99ddc}"
+  }
+]
